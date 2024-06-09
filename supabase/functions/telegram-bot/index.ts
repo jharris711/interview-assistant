@@ -1,6 +1,17 @@
 import { Bot, webhookCallback } from "grammy";
+import {
+  createClient,
+  FunctionsFetchError,
+  FunctionsHttpError,
+  FunctionsRelayError,
+} from "supabase";
 
 const bot = new Bot(Deno.env.get("BOT_TOKEN") || "");
+
+const supabaseClient = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+);
 
 bot.command("start", async (ctx) => {
   await ctx.reply(
@@ -14,12 +25,24 @@ bot.command("start", async (ctx) => {
 bot.on("message", async (ctx) => {
   try {
     if (ctx.message.text) {
-      await ctx.reply(
-        "This is the test response, which means I'm still working on this. Gimme a sec!",
-        {
-          entities: ctx.message.entities,
-        },
-      );
+      const { data: chatgptResponse, error: functionError } =
+        await supabaseClient.functions.invoke("openai", {
+          body: { query: ctx.message.text },
+        });
+
+      if (functionError instanceof FunctionsHttpError) {
+        const errorMessage = await functionError.context.json();
+        console.log("Function returned an error", errorMessage);
+        throw new Error(`Function returned an error: ${errorMessage.message}`);
+      } else if (functionError instanceof FunctionsRelayError) {
+        console.log("Relay error:", functionError.message);
+        throw new Error(`Relay error: ${functionError.message}`);
+      } else if (functionError instanceof FunctionsFetchError) {
+        console.log("Fetch error:", functionError.message);
+        throw new Error(`Fetch error: ${functionError.message}`);
+      }
+
+      await ctx.reply(chatgptResponse);
     } else {
       await ctx.reply("I couldn't understand that");
     }
