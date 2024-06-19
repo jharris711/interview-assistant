@@ -1,5 +1,9 @@
 import OpenAI from "openai";
-import type { ChatModel } from "openai/resources";
+import type {
+  ChatCompletionSystemMessageParam,
+  ChatCompletionUserMessageParam,
+  ChatModel,
+} from "openai/resources";
 
 Deno.serve(async (req) => {
   const { query } = await req.json();
@@ -12,21 +16,25 @@ Deno.serve(async (req) => {
       apiKey: apiKey,
     });
 
+    const initialSystemMessage: ChatCompletionSystemMessageParam = {
+      role: "system",
+      content: "You are to act as my helpful assistant. \
+        Help me resolve my queries, please.",
+    };
+
+    const userMessage: ChatCompletionUserMessageParam = {
+      role: "user",
+      content: query,
+    };
+
     const completion = await openai.chat.completions.create({
-      messages: [{
-        role: "system",
-        content: "You are to act as my helpful assistant. \
-          Help me resolve my queries, please.",
-      }, {
-        role: "user",
-        content: query,
-      }],
+      messages: [initialSystemMessage, userMessage],
       model: model as ChatModel,
     });
 
-    const reply = completion.choices[0].message.content;
+    const { content } = completion.choices[0].message;
 
-    return new Response(reply, {
+    return new Response(content, {
       headers: { "Content-Type": "text/plain" },
     });
   } catch (err) {
