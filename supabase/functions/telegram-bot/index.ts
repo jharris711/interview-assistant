@@ -7,15 +7,33 @@ import {
 } from "supabase";
 
 const bot = new Bot(Deno.env.get("BOT_TOKEN") || "");
-
 const supabaseClient = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_ANON_KEY") ?? "",
 );
 
 bot.command("start", async (ctx) => {
+  const { error: createChatError } = await supabaseClient
+    .from("chats")
+    .upsert(ctx.chat);
+
+  if (createChatError) throw createChatError;
+
+  if (!ctx.message || !ctx.message.from) {
+    throw new Error("No user found in message");
+  }
+
+  const user = ctx.message
+    ?.from;
+
+  const { error: createUserError } = await supabaseClient
+    .from("users")
+    .upsert(user);
+
+  if (createUserError) throw createUserError;
+
   await ctx.reply(
-    "Welcome to the chat! What would you like to discuss today?",
+    `Welcome to the chat, ${user.first_name}! What would you like to discuss today?`,
     {
       entities: ctx.message?.entities,
     },
